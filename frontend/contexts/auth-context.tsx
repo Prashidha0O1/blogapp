@@ -3,6 +3,7 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import { authAPI } from "@/lib/api"
+import { useStore } from "@/store/useStore"
 
 interface User {
   id: string
@@ -23,8 +24,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const { user, token, setUser, clearAuth } = useStore()
 
   useEffect(() => {
     // Check for stored user data on mount
@@ -32,10 +33,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedToken = localStorage.getItem("blog-token")
     
     if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser))
+      setUser(JSON.parse(storedUser), storedToken)
     }
     setIsLoading(false)
-  }, [])
+  }, [setUser])
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true)
@@ -43,10 +44,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authAPI.login(email, password)
       const { token, user: userData } = response.data
       
-      // Store token and user data
+      // Store token and user data in both localStorage and Zustand store
       localStorage.setItem("blog-token", token)
       localStorage.setItem("blog-user", JSON.stringify(userData))
-      setUser(userData)
+      setUser(userData, token)
       setIsLoading(false)
       return true
     } catch (error) {
@@ -62,10 +63,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authAPI.register(userData)
       const { token, user: newUser } = response.data
       
-      // Store token and user data
+      // Store token and user data in both localStorage and Zustand store
       localStorage.setItem("blog-token", token)
       localStorage.setItem("blog-user", JSON.stringify(newUser))
-      setUser(newUser)
+      setUser(newUser, token)
       setIsLoading(false)
       return true
     } catch (error) {
@@ -77,11 +78,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await authAPI.logout()
+      if (token) {
+        await authAPI.logout()
+      }
     } catch (error) {
       console.error("Logout error:", error)
     } finally {
-      setUser(null)
+      // Clear auth data from both localStorage and Zustand store
+      clearAuth()
       localStorage.removeItem("blog-user")
       localStorage.removeItem("blog-token")
     }

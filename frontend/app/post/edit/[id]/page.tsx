@@ -13,12 +13,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Textarea } from "@/components/ui/textarea"
 import { redirect } from 'next/navigation';
 
-export default function CreatePostPage() {
+interface Post {
+  id: number;
+  title: string;
+  content: string;
+  author: string;
+  created_at: string;
+}
+
+export default function EditPostPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { id } = params;
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -26,6 +36,36 @@ export default function CreatePostPage() {
       redirect('/login');
     }
   }, [user, isLoading]);
+
+  // Fetch post data for editing
+  useEffect(() => {
+    const fetchPost = async () => {
+      try {
+        const response = await blogAPI.getPost(id);
+        const postData: Post = response.data;
+        
+        // Check if user is the author
+        if (user && user.username !== postData.author) {
+          toast.error('You can only edit your own posts');
+          router.push('/post');
+          return;
+        }
+        
+        setTitle(postData.title);
+        setContent(postData.content);
+      } catch (error: any) {
+        const errorMsg = error.response?.data?.error || 'Failed to load post';
+        toast.error(errorMsg);
+        router.push('/post');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user && !isLoading) {
+      fetchPost();
+    }
+  }, [id, user, isLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,23 +76,23 @@ export default function CreatePostPage() {
 
     setIsSubmitting(true);
     try {
-      await blogAPI.createPost({ title, content });
-      toast.success('Post created successfully!');
-      setTimeout(() => router.push('/post'), 1500);
+      await blogAPI.updatePost(id, { title, content });
+      toast.success('Post updated successfully!');
+      setTimeout(() => router.push(`/post/${id}`), 1500);
     } catch (error: any) {
-      const errorMsg = error.response?.data?.error || 'Failed to create post';
+      const errorMsg = error.response?.data?.error || 'Failed to update post';
       toast.error(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isLoading) {
+  if (isLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-accent/5 p-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">Loading post...</p>
         </div>
       </div>
     );
@@ -67,8 +107,8 @@ export default function CreatePostPage() {
       <div className="max-w-2xl mx-auto">
         <Card className="shadow-lg border-0 bg-card/50 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="text-2xl">Create New Post</CardTitle>
-            <CardDescription>Share your thoughts with the community</CardDescription>
+            <CardTitle className="text-2xl">Edit Post</CardTitle>
+            <CardDescription>Update your post content</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -104,7 +144,7 @@ export default function CreatePostPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => router.push('/post')}
+                  onClick={() => router.push(`/post/${id}`)}
                   disabled={isSubmitting}
                 >
                   Cancel
@@ -113,7 +153,7 @@ export default function CreatePostPage() {
                   type="submit"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? "Creating..." : "Create Post"}
+                  {isSubmitting ? "Updating..." : "Update Post"}
                 </Button>
               </div>
             </form>
