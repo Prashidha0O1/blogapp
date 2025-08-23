@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,46 +11,45 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, Mail, Lock } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function LoginPage() {
+  const router = useRouter()
+  const { login, isLoading: authLoading } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
     setError("")
 
     // Basic validation
     if (!email || !password) {
       setError("Please fill in all fields")
-      setIsLoading(false)
       return
     }
 
     if (!email.includes("@")) {
       setError("Please enter a valid email address")
-      setIsLoading(false)
       return
     }
 
-    // Simulate login process
+    // Attempt login
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      if (email === "" && password === "") {
-        window.location.href = "/"
+      const success = await login(email, password)
+      if (success) {
+        router.push("/dashboard")
       } else {
         setError("Invalid email or password")
       }
     } catch (err) {
       setError("An error occurred. Please try again.")
-    } finally {
-      setIsLoading(false)
     }
   }
+
+  const isLoading = authLoading
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-accent/5 p-4">
@@ -137,16 +137,9 @@ export default function LoginPage() {
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
                 Don't have an account?{" "}
-                <Link href="/signup" className="text-secondary hover:text-secondary/80 font-medium transition-colors">
+                <Link href="/register" className="text-secondary hover:text-secondary/80 font-medium transition-colors">
                   Sign up
                 </Link>
-              </p>
-            </div>
-
-            <div className="mt-4 text-center">
-              <p className="text-xs text-muted-foreground">
-                Demo: Use <span className="font-mono bg-muted px-1 rounded">demo@example.com</span> /{" "}
-                <span className="font-mono bg-muted px-1 rounded">password</span>
               </p>
             </div>
           </CardContent>

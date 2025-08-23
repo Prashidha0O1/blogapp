@@ -2,17 +2,20 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
+import { authAPI } from "@/lib/api"
 
 interface User {
   id: string
-  name: string
+  username: string
   email: string
+  first_name?: string
+  last_name?: string
 }
 
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<boolean>
-  signup: (name: string, email: string, password: string) => Promise<boolean>
+  signup: (userData: { username: string; email: string; password: string; first_name?: string; last_name?: string }) => Promise<boolean>
   logout: () => void
   isLoading: boolean
 }
@@ -26,7 +29,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check for stored user data on mount
     const storedUser = localStorage.getItem("blog-user")
-    if (storedUser) {
+    const storedToken = localStorage.getItem("blog-token")
+    
+    if (storedUser && storedToken) {
       setUser(JSON.parse(storedUser))
     }
     setIsLoading(false)
@@ -34,51 +39,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true)
-
-    // Mock authentication - in real app, this would be an API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    if (email && password) {
-      const mockUser = {
-        id: "1",
-        name: email.split("@")[0],
-        email,
-      }
-      setUser(mockUser)
-      localStorage.setItem("blog-user", JSON.stringify(mockUser))
+    try {
+      const response = await authAPI.login(email, password)
+      const { token, user: userData } = response.data
+      
+      // Store token and user data
+      localStorage.setItem("blog-token", token)
+      localStorage.setItem("blog-user", JSON.stringify(userData))
+      setUser(userData)
       setIsLoading(false)
       return true
+    } catch (error) {
+      console.error("Login error:", error)
+      setIsLoading(false)
+      return false
     }
-
-    setIsLoading(false)
-    return false
   }
 
-  const signup = async (name: string, email: string, password: string): Promise<boolean> => {
+  const signup = async (userData: { username: string; email: string; password: string; first_name?: string; last_name?: string }): Promise<boolean> => {
     setIsLoading(true)
-
-    // Mock signup - in real app, this would be an API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    if (name && email && password) {
-      const mockUser = {
-        id: Date.now().toString(),
-        name,
-        email,
-      }
-      setUser(mockUser)
-      localStorage.setItem("blog-user", JSON.stringify(mockUser))
+    try {
+      const response = await authAPI.register(userData)
+      const { token, user: newUser } = response.data
+      
+      // Store token and user data
+      localStorage.setItem("blog-token", token)
+      localStorage.setItem("blog-user", JSON.stringify(newUser))
+      setUser(newUser)
       setIsLoading(false)
       return true
+    } catch (error) {
+      console.error("Signup error:", error)
+      setIsLoading(false)
+      return false
     }
-
-    setIsLoading(false)
-    return false
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem("blog-user")
+  const logout = async () => {
+    try {
+      await authAPI.logout()
+    } catch (error) {
+      console.error("Logout error:", error)
+    } finally {
+      setUser(null)
+      localStorage.removeItem("blog-user")
+      localStorage.removeItem("blog-token")
+    }
   }
 
   return <AuthContext.Provider value={{ user, login, signup, logout, isLoading }}>{children}</AuthContext.Provider>
