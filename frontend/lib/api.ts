@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({
-  baseURL: 'http://localhost:8000/api', // Django backend URL
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api', // Django backend URL
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -32,6 +32,12 @@ apiClient.interceptors.response.use(
       localStorage.removeItem('blog-user');
       localStorage.removeItem('blog-token');
       window.location.href = '/login';
+    } else if (error.response?.status === 403) {
+      // Unauthorized access, redirect to forbidden page
+      window.location.href = '/forbidden';
+    } else if (error.response?.status === 404) {
+      // Resource not found, redirect to pagenotfound
+      window.location.href = '/pagenotfound';
     }
     return Promise.reject(error);
   }
