@@ -20,12 +20,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-!z6$#8^!+z!+z!+z!+z!+z!+z!+z!+z!+z!+z!+z!+z!+z!+z!'
+SECRET_KEY = '&004@j%=&x=3#%z^uph_=7(@rfs74^q#vmm&_^%ewkp&z(_*h*'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'backend']
 
 # CORS settings for frontend connection
 CORS_ALLOWED_ORIGINS = [
@@ -140,3 +140,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Custom User Model
 AUTH_USER_MODEL = 'blog_api.User'
+
+# Custom Authentication Backend
+AUTHENTICATION_BACKENDS = [
+    'blog_api.authentication.EmailOrUsernameModelBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]

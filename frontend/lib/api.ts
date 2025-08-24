@@ -45,8 +45,8 @@ apiClient.interceptors.response.use(
 
 // Auth API functions
 export const authAPI = {
-  login: (email: string, password: string): Promise<AxiosResponse<{ token: string; user: any }>> => {
-    return apiClient.post('/auth/login/', { email, password });
+  login: (username: string, password: string): Promise<AxiosResponse<{ token: string; user: any }>> => {
+    return apiClient.post('/login/', { username, password });
   },
   
   register: (userData: {
@@ -55,9 +55,8 @@ export const authAPI = {
     password: string;
     first_name?: string;
     last_name?: string;
-    bio?: string;
   }): Promise<AxiosResponse<{ token: string; user: any }>> => {
-    return apiClient.post('/auth/register/', userData);
+    return apiClient.post('/register/', userData);
   },
   
   logout: (): Promise<AxiosResponse> => {

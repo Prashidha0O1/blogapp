@@ -25,10 +25,13 @@ def verify_token(token):
         user = User.objects.get(id=user_id)
         return user
     except jwt.ExpiredSignatureError:
+        print("Token has expired")
         return None
     except jwt.InvalidTokenError:
+        print("Invalid token")
         return None
     except User.DoesNotExist:
+        print("User not found")
         return None
 
 def jwt_required(view_func):

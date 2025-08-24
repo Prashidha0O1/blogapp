@@ -38,10 +38,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [setUser])
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (username: string, password: string): Promise<boolean> => {
     setIsLoading(true)
     try {
-      const response = await authAPI.login(email, password)
+      const response = await authAPI.login(username, password)
       const { token, user: userData } = response.data
       
       // Store token and user data in both localStorage and Zustand store

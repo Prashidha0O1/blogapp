@@ -16,7 +16,7 @@ import { useAuth } from "@/contexts/auth-context"
 export default function LoginPage() {
   const router = useRouter()
   const { login, isLoading: authLoading } = useAuth()
-  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
@@ -26,23 +26,18 @@ export default function LoginPage() {
     setError("")
 
     // Basic validation
-    if (!email || !password) {
+    if (!username || !password) {
       setError("Please fill in all fields")
-      return
-    }
-
-    if (!email.includes("@")) {
-      setError("Please enter a valid email address")
       return
     }
 
     // Attempt login
     try {
-      const success = await login(email, password)
+      const success = await login(username, password)
       if (success) {
         router.push("/dashboard")
       } else {
-        setError("Invalid email or password")
+        setError("Invalid username or password")
       }
     } catch (err) {
       setError("An error occurred. Please try again.")
@@ -68,17 +63,17 @@ export default function LoginPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-foreground">
-                  Email Address
+                <Label htmlFor="username" className="text-sm font-medium text-foreground">
+                  Username or Email
                 </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="username"
+                    type="text"
+                    placeholder="Enter your username or email"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     className="pl-10 bg-input border-border focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200"
                     required
                   />
