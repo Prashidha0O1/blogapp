@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   backend:
@@ -11,6 +10,7 @@ services:
       - ./backend:/app
     environment:
       - DEBUG=1
+      - SECRET_KEY=urh^8b&je7p2or9a9ljv@%cyrh(*%nw72@0vql!w*&43!t&+y3
     depends_on:
       - db
 
@@ -25,7 +25,8 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://backend:8000/api
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+      - NEXT_PUBLIC_RUNNING_IN_DOCKER=true
     depends_on:
       - backend
 

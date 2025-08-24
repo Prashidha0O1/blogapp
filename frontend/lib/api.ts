@@ -1,8 +1,20 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
+// Log environment variables for debugging
+console.log('NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+console.log('NEXT_PUBLIC_RUNNING_IN_DOCKER:', process.env.NEXT_PUBLIC_RUNNING_IN_DOCKER);
+console.log('NODE_ENV:', process.env.NODE_ENV);
+
+// Determine the base URL
+const baseURL = process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NEXT_PUBLIC_RUNNING_IN_DOCKER === 'true' ? 'http://backend:8000/api' : 'http://localhost:8000/api');
+
+// Log the baseURL for debugging
+console.log('API Base URL:', baseURL);
+
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api', // Django backend URL
+  baseURL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -12,6 +24,7 @@ const apiClient: AxiosInstance = axios.create({
 // Add a request interceptor to include auth token
 apiClient.interceptors.request.use(
   (config) => {
+    // console.log('Making request to:', config.baseURL, config.url);
     const token = localStorage.getItem('blog-token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -19,6 +32,7 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error('Request error:', error);
     return Promise.reject(error);
   }
 );
@@ -68,7 +82,7 @@ export const authAPI = {
   }
 };
 
-// Blog API functions
+// Blog API functionstfr
 export const blogAPI = {
   getPosts: (): Promise<AxiosResponse<any[]>> => {
     return apiClient.get('/posts/');

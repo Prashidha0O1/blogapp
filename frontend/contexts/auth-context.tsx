@@ -40,8 +40,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (username: string, password: string): Promise<boolean> => {
     setIsLoading(true)
+    console.log("Attempting login with username:", username);
     try {
       const response = await authAPI.login(username, password)
+      console.log("Login response:", response);
       const { token, user: userData } = response.data
       
       // Store token and user data in both localStorage and Zustand store
@@ -59,8 +61,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = async (userData: { username: string; email: string; password: string; first_name?: string; last_name?: string }): Promise<boolean> => {
     setIsLoading(true)
+    console.log("Attempting signup with data:", userData);
     try {
       const response = await authAPI.register(userData)
+      console.log("Signup response:", response);
       const { token, user: newUser } = response.data
       
       // Store token and user data in both localStorage and Zustand store
@@ -69,8 +73,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(newUser, token)
       setIsLoading(false)
       return true
-    } catch (error) {
+    } catch (error: any) {
       console.error("Signup error:", error)
+      if (error.response && error.response.data) {
+        console.error("Backend error data:", error.response.data);
+      }
       setIsLoading(false)
       return false
     }
