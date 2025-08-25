@@ -1,4 +1,5 @@
-import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { useStore } from "@/store/useStore";
 
 // Log environment variables for debugging
 console.log('NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
@@ -37,15 +38,75 @@ apiClient.interceptors.request.use(
   }
 );
 
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (value?: unknown) => void; reject: (reason?: any) => void; config: InternalAxiosRequestConfig }> = [];
+
+const processQueue = (error: any | null, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 // Add a response interceptor to handle token refresh or logout on 401
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid, clear local storage and redirect to login
-      localStorage.removeItem('blog-user');
-      localStorage.removeItem('blog-token');
-      window.location.href = '/login';
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Handle 401 errors for token refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject, config: originalRequest });
+        }).then((token) => {
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return apiClient(originalRequest);
+        }).catch((err) => Promise.reject(err));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      const { refreshToken, setUser, clearAuth } = useStore.getState();
+
+      if (refreshToken) {
+        try {
+          const response = await authAPI.refreshToken(refreshToken);
+          const { access_token, refresh_token } = response.data;
+
+          localStorage.setItem('blog-token', access_token);
+          localStorage.setItem('blog-refresh-token', refresh_token);
+          setUser(useStore.getState().user, access_token, refresh_token);
+
+          apiClient.defaults.headers.common.Authorization = `Bearer ${access_token}`;
+          originalRequest.headers.Authorization = `Bearer ${access_token}`;
+          processQueue(null, access_token);
+          return apiClient(originalRequest);
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+          clearAuth();
+          localStorage.removeItem('blog-user');
+          localStorage.removeItem('blog-token');
+          localStorage.removeItem('blog-refresh-token');
+          processQueue(refreshError);
+          window.location.href = '/login';
+          return Promise.reject(refreshError);
+        } finally {
+          isRefreshing = false;
+        }
+      } else {
+        clearAuth();
+        localStorage.removeItem('blog-user');
+        localStorage.removeItem('blog-token');
+        localStorage.removeItem('blog-refresh-token');
+        window.location.href = '/login';
+        return Promise.reject(error);
+      }
     } else if (error.response?.status === 403) {
       // Unauthorized access, redirect to forbidden page
       window.location.href = '/forbidden';
@@ -59,7 +120,7 @@ apiClient.interceptors.response.use(
 
 // Auth API functions
 export const authAPI = {
-  login: (username: string, password: string): Promise<AxiosResponse<{ token: string; user: any }>> => {
+  login: (username: string, password: string): Promise<AxiosResponse<{ access_token: string; refresh_token: string; user: any }>> => {
     return apiClient.post('/login/', { username, password });
   },
   
@@ -69,8 +130,12 @@ export const authAPI = {
     password: string;
     first_name?: string;
     last_name?: string;
-  }): Promise<AxiosResponse<{ token: string; user: any }>> => {
+  }): Promise<AxiosResponse<{ access_token: string; refresh_token: string; user: any }>> => {
     return apiClient.post('/register/', userData);
+  },
+
+  refreshToken: (refreshToken: string): Promise<AxiosResponse<{ access_token: string; refresh_token: string }>> => {
+    return apiClient.post('/auth/refresh-token/', { refresh_token: refreshToken });
   },
   
   logout: (): Promise<AxiosResponse> => {

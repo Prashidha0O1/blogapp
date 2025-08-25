@@ -4,8 +4,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.contrib.auth import authenticate
+from django.core.paginator import Paginator
 from .models import User, Post
-from .utils import generate_token, jwt_required
+from .utils import generate_token, jwt_required, verify_refresh_token
 import json
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -43,7 +44,7 @@ class RegisterView(View):
             print(f"User created successfully: {user.username}")
             
             # Generate token for the new user
-            token = generate_token(user.id)
+            access_token, refresh_token = generate_token(user.id)
             print("Token generated")
             
             # Return token and user data to match frontend expectations
@@ -57,7 +58,8 @@ class RegisterView(View):
             
             print("Sending success response")
             return JsonResponse({
-                'token': token,
+                'access_token': access_token,
+                'refresh_token': refresh_token,
                 'user': user_data
             }, status=201)
         except Exception as e:
@@ -84,7 +86,7 @@ class LoginView(View):
                 return JsonResponse({'error': 'Invalid credentials'}, status=401)
             
             print(f"User authenticated: {user.username}")
-            token = generate_token(user.id)
+            access_token, refresh_token = generate_token(user.id)
             print("Token generated")
             
             # Return token and user data to match frontend expectations
@@ -98,7 +100,8 @@ class LoginView(View):
             
             print("Sending success response")
             return JsonResponse({
-                'token': token,
+                'access_token': access_token,
+                'refresh_token': refresh_token,
                 'user': user_data
             }, status=200)
         except Exception as e:
@@ -107,8 +110,25 @@ class LoginView(View):
 
 class PostListView(View):
     def get(self, request):
-        posts = Post.objects.all().values('id', 'title', 'content', 'author__username', 'created_at')
-        return JsonResponse(list(posts), safe=False)
+        page_number = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 10)
+        
+        posts = Post.objects.all().values('id', 'title', 'content', 'author__username', 'created_at').order_by('-created_at')
+        paginator = Paginator(posts, page_size)
+        
+        try:
+            page_obj = paginator.page(page_number)
+        except Exception:
+            page_obj = paginator.page(1) # Fallback to first page if page_number is invalid
+            
+        return JsonResponse({
+            'posts': list(page_obj.object_list),
+            'page': page_obj.number,
+            'pages': paginator.num_pages,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+            'total_posts': paginator.count,
+        }, safe=False)
     
     @jwt_required
     def post(self, request):
@@ -193,4 +213,28 @@ class LogoutView(View):
         # For JWT authentication, logout is typically handled client-side
         # by deleting the token. Server-side we just return a success response.
         return JsonResponse({'message': 'Logged out successfully'}, status=200)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class RefreshTokenView(View):
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+            refresh_token = data.get('refresh_token')
+
+            if not refresh_token:
+                return JsonResponse({'error': 'Refresh token is required'}, status=400)
+
+            user = verify_refresh_token(refresh_token)
+
+            if not user:
+                return JsonResponse({'error': 'Invalid or expired refresh token'}, status=401)
+
+            access_token, new_refresh_token = generate_token(user.id)
+
+            return JsonResponse({
+                'access_token': access_token,
+                'refresh_token': new_refresh_token,
+            }, status=200)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
 

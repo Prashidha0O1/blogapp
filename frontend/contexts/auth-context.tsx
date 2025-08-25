@@ -19,21 +19,23 @@ interface AuthContextType {
   signup: (userData: { username: string; email: string; password: string; first_name?: string; last_name?: string }) => Promise<boolean>
   logout: () => void
   isLoading: boolean
+  refreshToken?: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
-  const { user, token, setUser, clearAuth } = useStore()
+  const { user, token, refreshToken, setUser, clearAuth } = useStore()
 
   useEffect(() => {
     // Check for stored user data on mount
     const storedUser = localStorage.getItem("blog-user")
     const storedToken = localStorage.getItem("blog-token")
+    const storedRefreshToken = localStorage.getItem("blog-refresh-token")
     
-    if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser), storedToken)
+    if (storedUser && storedToken && storedRefreshToken) {
+      setUser(JSON.parse(storedUser), storedToken, storedRefreshToken)
     }
     setIsLoading(false)
   }, [setUser])
@@ -44,12 +46,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await authAPI.login(username, password)
       console.log("Login response:", response);
-      const { token, user: userData } = response.data
+      const { access_token, refresh_token, user: userData } = response.data
       
-      // Store token and user data in both localStorage and Zustand store
-      localStorage.setItem("blog-token", token)
+      // Store tokens and user data in both localStorage and Zustand store
+      localStorage.setItem("blog-token", access_token)
+      localStorage.setItem("blog-refresh-token", refresh_token)
       localStorage.setItem("blog-user", JSON.stringify(userData))
-      setUser(userData, token)
+      setUser(userData, access_token, refresh_token)
       setIsLoading(false)
       return true
     } catch (error) {
@@ -65,12 +68,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await authAPI.register(userData)
       console.log("Signup response:", response);
-      const { token, user: newUser } = response.data
+      const { access_token, refresh_token, user: newUser } = response.data
       
-      // Store token and user data in both localStorage and Zustand store
-      localStorage.setItem("blog-token", token)
+      // Store tokens and user data in both localStorage and Zustand store
+      localStorage.setItem("blog-token", access_token)
+      localStorage.setItem("blog-refresh-token", refresh_token)
       localStorage.setItem("blog-user", JSON.stringify(newUser))
-      setUser(newUser, token)
+      setUser(newUser, access_token, refresh_token)
       setIsLoading(false)
       return true
     } catch (error: any) {
@@ -95,10 +99,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearAuth()
       localStorage.removeItem("blog-user")
       localStorage.removeItem("blog-token")
+      localStorage.removeItem("blog-refresh-token")
     }
   }
 
-  return <AuthContext.Provider value={{ user, login, signup, logout, isLoading }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, login, signup, logout, isLoading, refreshToken }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

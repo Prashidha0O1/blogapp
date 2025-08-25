@@ -14,15 +14,20 @@ interface Post {
 interface BlogListPageProps {
   posts: Post[];
   error?: string;
+  page?: number;
+  pages?: number;
+  has_next?: boolean;
+  has_previous?: boolean;
+  total_posts?: number;
 }
 
-export default function BlogListPage({ posts, error }: BlogListPageProps) {
+export default function BlogListPage({ posts, error, page, pages, has_next, has_previous, total_posts }: BlogListPageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-accent/5 p-4">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Blog Posts</h1>
+            <h1 className="text-3xl font-bold text-foreground">Blog Posts ({total_posts})</h1>
             <p className="text-muted-foreground">Discover amazing content from our community</p>
           </div>
           <Button asChild>
@@ -72,24 +77,47 @@ export default function BlogListPage({ posts, error }: BlogListPageProps) {
             ))}
           </div>
         )}
+
+        {pages && pages > 1 && (
+          <div className="flex justify-center items-center space-x-4 mt-8">
+            <Button asChild variant="outline" disabled={!has_previous}>
+              <Link href={`/post?page=${Number(page) - 1}&page_size=10`}>Previous</Link>
+            </Button>
+            <span className="text-muted-foreground">
+              Page {page} of {pages}
+            </span>
+            <Button asChild variant="outline" disabled={!has_next}>
+              <Link href={`/post?page=${Number(page) + 1}&page_size=10`}>Next</Link>
+            </Button>
+          </div>
+        )}
+
       </div>
     </div>
   );
 }
 
 // Server-side rendering
-export async function getServerSideProps() {
+export async function getServerSideProps({ query }: any) {
   try {
     // Determine the base URL
     const baseURL = process.env.NEXT_PUBLIC_API_URL ||
       (process.env.NEXT_PUBLIC_RUNNING_IN_DOCKER === 'true' ? 'http://backend:8000/api' : 'http://localhost:8000/api');
     
+    const page = query.page || 1;
+    const pageSize = query.page_size || 10;
+
     // Fetch posts from the API
-    const response = await axios.get(`${baseURL}/posts/`);
+    const response = await axios.get(`${baseURL}/posts/?page=${page}&page_size=${pageSize}`);
     
     return {
       props: {
-        posts: response.data,
+        posts: response.data.posts,
+        page: response.data.page,
+        pages: response.data.pages,
+        has_next: response.data.has_next,
+        has_previous: response.data.has_previous,
+        total_posts: response.data.total_posts,
       },
     };
   } catch (error) {
