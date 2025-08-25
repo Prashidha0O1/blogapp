@@ -1,14 +1,13 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import axios from 'axios';
+import { useAuth } from '@/contexts/auth-context';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { blogAPI } from '@/lib/api';
-import { useAuth } from '@/contexts/auth-context';
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface Post {
   id: number;
@@ -18,30 +17,16 @@ interface Post {
   created_at: string;
 }
 
-export default function PostDetailPage({ params }: { params: { id: string } }) {
-  const router = useRouter();
-  const { id } = params;
-  const { user } = useAuth();
-  const [post, setPost] = useState<Post | null>(null);
-  const [loading, setLoading] = useState(true);
+interface PostDetailPageProps {
+  post: Post | null;
+  error?: string;
+  id: string;
+}
 
-  useEffect(() => {
-    const fetchPost = async () => {
-      try {
-        const response = await blogAPI.getPost(id);
-        setPost(response.data);
-      } catch (error: any) {
-        const errorMsg = error.response?.data?.error || 'Failed to load post';
-        toast.error(errorMsg);
-        if (error.response?.status === 404) {
-          router.push('/post'); // Redirect to posts list on 404
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPost();
-  }, [id, router]);
+export default function PostDetailPage({ post, error, id }: PostDetailPageProps) {
+  const router = useRouter();
+  const { user } = useAuth();
+  const [postState, setPostState] = useState<Post | null>(post);
 
   const handleDelete = async () => {
     if (!user) {
@@ -58,22 +43,33 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
     }
   };
 
-  if (loading) {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-accent/5 p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading post...</p>
+          <p className="text-destructive text-xl">{error}</p>
+          <Button asChild variant="outline" className="mt-4">
+            <Link href="/post">← Back to Posts</Link>
+          </Button>
         </div>
       </div>
     );
   }
 
-  if (!post) {
-    return null; // Handled by redirect in useEffect
+  if (!postState) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-accent/5 p-4">
+        <div className="text-center">
+          <p className="text-muted-foreground">Post not found</p>
+          <Button asChild variant="outline" className="mt-4">
+            <Link href="/post">← Back to Posts</Link>
+          </Button>
+        </div>
+      </div>
+    );
   }
 
-  const isAuthor = user && user.username === post.author;
+  const isAuthor = user && user.username === postState.author;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-accent/5 p-4">
@@ -82,9 +78,9 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
           <CardHeader>
             <div className="flex justify-between items-start">
               <div>
-                <CardTitle className="text-3xl mb-2">{post.title}</CardTitle>
+                <CardTitle className="text-3xl mb-2">{postState.title}</CardTitle>
                 <CardDescription>
-                  By {post.author} on {new Date(post.created_at).toLocaleDateString()}
+                  By {postState.author} on {new Date(postState.created_at).toLocaleDateString()}
                 </CardDescription>
               </div>
               {isAuthor && (
@@ -101,7 +97,7 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
           </CardHeader>
           <CardContent>
             <div className="prose max-w-none mb-6">
-              <p className="text-foreground whitespace-pre-wrap">{post.content}</p>
+              <p className="text-foreground whitespace-pre-wrap">{postState.content}</p>
             </div>
             <Button asChild variant="outline">
               <Link href="/post">← Back to Posts</Link>
@@ -112,4 +108,46 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
       <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
+}
+
+// Server-side rendering
+export async function getServerSideProps(context: any) {
+  const { id } = context.params;
+  
+  try {
+    // Determine the base URL
+    const baseURL = process.env.NEXT_PUBLIC_API_URL ||
+      (process.env.NEXT_PUBLIC_RUNNING_IN_DOCKER === 'true' ? 'http://backend:8000/api' : 'http://localhost:8000/api');
+    
+    // Fetch post from the API
+    const response = await axios.get(`${baseURL}/posts/${id}/`);
+    
+    return {
+      props: {
+        post: response.data,
+        id,
+      },
+    };
+  } catch (error: any) {
+    console.error('Failed to fetch post:', error);
+    
+    // Handle 404 case
+    if (error.response?.status === 404) {
+      return {
+        props: {
+          post: null,
+          error: 'Post not found',
+          id,
+        },
+      };
+    }
+    
+    return {
+      props: {
+        post: null,
+        error: 'Failed to load post',
+        id,
+      },
+    };
+  }
 }
